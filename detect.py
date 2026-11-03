@@ -78,9 +78,34 @@ def detect_web():
                                  src_ip=ip, count=len(sh), evidence=[up[0][4]] + [r[4] for r in sh[:3]]))
     return findings
 
+NEWUSER = re.compile(r"COMMAND=\S*(?:useradd|adduser)\s+(?:.*\s)?(\S+)$")
+CRON_FOR_USER = re.compile(r"COMMAND=\S*crontab\s+(?:.*\s)?-u\s+(\S+)")
+
+
+def detect_new_user_then_cron(window=300):
+    """Correlation rule: a new account gets a scheduled job within `window` seconds."""
+    findings, created = [], {}
+    for line in open(AUTH):
+        line = line.rstrip()
+        if "sudo:" not in line:
+            continue
+        t = ts(line[:15])
+        if m := NEWUSER.search(line):
+            created[m.group(1)] = (t, line)
+        elif m := CRON_FOR_USER.search(line):
+            user = m.group(1)
+            if user in created:
+                gap = int((t - created[user][0]).total_seconds())
+                if 0 <= gap <= window:
+                    findings.append(dict(rule="new_user_then_cron", severity="high", mitre="T1136/T1053",
+                                         title=f"New account '{user}' got a scheduled job {gap}s after creation",
+                                         evidence=[created[user][1], line]))
+    return findings
+
+
 
 def run():
-    return detect_ssh() + detect_web()
+    return detect_ssh() + detect_web() + detect_new_user_then_cron()
 
 
 if __name__ == "__main__":

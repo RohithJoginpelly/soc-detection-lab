@@ -68,3 +68,9 @@ def test_every_finding_has_mitre_and_evidence(findings):
     for f in findings:
         assert f["mitre"]
         assert f["evidence"]
+
+
+def test_new_user_then_cron_correlation(findings):
+    hit = [f for f in findings if f["rule"] == "new_user_then_cron"]
+    assert len(hit) == 1
+    assert "svc_backup" in hit[0]["title"]

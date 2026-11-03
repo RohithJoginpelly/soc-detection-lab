@@ -39,3 +39,11 @@ Each rule lives in `detect.py`. Test status is covered by `tests/test_detect.py`
 - **Logic:** successful POST to an upload endpoint plus successful GET to `/uploads/*.php?cmd=` style URLs from the same IP.
 - **False positives:** very rare.
 - **Response:** isolate the server, preserve evidence, remove the file, find the upload path and patch it.
+
+## new_user_then_cron (T1136, T1053)
+- **Hypothesis:** an attacker who gains access often creates a new account and schedules a job for it to keep access. Either action alone is common, but both within minutes is rare.
+- **Data source:** `auth.log` (`sudo` command lines).
+- **Logic:** a `useradd` or `adduser` command, followed by a `crontab -u <same user>` command within 300 seconds. The rule tracks each new user and fires only when the same account gets the job.
+- **False positives:** an administrator legitimately setting up a service account and its scheduled job in one session. Tune with an allowlist of known admin accounts.
+- **Limitations:** an attacker who waits more than 5 minutes, or who uses a different method for persistence (such as SSH keys or systemd timers), evades it.
+- **Response:** verify with the account owner. If unexpected, disable the new account, remove its job and review the session that created it.
