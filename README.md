@@ -84,7 +84,7 @@ pytest
 ## Investigation write-ups
 
 See [docs/incident_report_template.md](docs/incident_report_template.md) for the report format used. Add your own completed reports under `docs/reports/`.
-
+- [Incident 01: web01 intrusion](docs/reports/01-web01-intrusion.md)
 ## Roadmap
 
 - [ ] Ship logs to Elastic/Kibana with Filebeat and build a dashboard
