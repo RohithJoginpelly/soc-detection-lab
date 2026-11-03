@@ -104,8 +104,35 @@ def detect_new_user_then_cron(window=300):
 
 
 
+def detect_slow_spray(window=1800, min_users=4):
+    """Flag an IP that tries many different usernames within a window, even below the brute-force threshold."""
+    findings, attempts = [], collections.defaultdict(list)
+    for line in open(AUTH):
+        line = line.rstrip()
+        if m := FAIL.match(line):
+            attempts[m.group(3)].append({"timestamp": ts(m.group(1)), "username": m.group(2), "line": line})
+    for ip, events in attempts.items():
+        events.sort(key=lambda e: e["timestamp"])
+        for i, current in enumerate(events):
+            start = current["timestamp"]
+            evidence = [current["line"]]
+            users = {current["username"]}
+            for nxt in events[i + 1:]:
+                if (nxt["timestamp"] - start).total_seconds() > window:
+                    break
+                users.add(nxt["username"])
+                if len(evidence) < 3:
+                    evidence.append(nxt["line"])
+            if len(users) >= min_users:
+                findings.append(dict(rule="slow_spray", severity="medium", mitre="T1110.003",
+                                     title=f"Possible password spray from {ip}: {len(users)} usernames within {window // 60} minutes",
+                                     src_ip=ip, distinct_users=len(users), evidence=evidence))
+                break
+    return findings
+
+
 def run():
-    return detect_ssh() + detect_web() + detect_new_user_then_cron()
+    return detect_ssh() + detect_web() + detect_new_user_then_cron() + detect_slow_spray()
 
 
 if __name__ == "__main__":

@@ -47,3 +47,11 @@ Each rule lives in `detect.py`. Test status is covered by `tests/test_detect.py`
 - **False positives:** an administrator legitimately setting up a service account and its scheduled job in one session. Tune with an allowlist of known admin accounts.
 - **Limitations:** an attacker who waits more than 5 minutes, or who uses a different method for persistence (such as SSH keys or systemd timers), evades it.
 - **Response:** verify with the account owner. If unexpected, disable the new account, remove its job and review the session that created it.
+
+## slow_spray (T1110.003)
+- **Hypothesis:** careful attackers try a few passwords against many accounts, staying below brute-force thresholds.
+- **Data source:** `auth.log` (`sshd` Failed password lines).
+- **Logic:** 4 or more distinct usernames tried by one IP within 30 minutes, regardless of total failure count.
+- **False positives:** shared office or NAT addresses where several users mistype passwords, and misconfigured automation using several service accounts.
+- **Limitations:** attacks spread across many IPs, or paced slower than one attempt per 30 minutes per account group, evade it.
+- **Response:** block the IP, check for any later successful login from it, and review the accounts targeted.
