@@ -55,3 +55,11 @@ Each rule lives in `detect.py`. Test status is covered by `tests/test_detect.py`
 - **False positives:** shared office or NAT addresses where several users mistype passwords, and misconfigured automation using several service accounts.
 - **Limitations:** attacks spread across many IPs, or paced slower than one attempt per 30 minutes per account group, evade it.
 - **Response:** block the IP, check for any later successful login from it, and review the accounts targeted.
+
+## 404_burst (T1595.003)
+- **Hypothesis:** automated scanners probe many pages that do not exist, so one IP collects many 404 responses for different paths in seconds.
+- **Data source:** `web_access.log` (status 404 responses).
+- **Logic:** 5 or more different paths returning 404 to one IP within 10 seconds. Repeated requests for the same missing page do not count.
+- **False positives:** search-engine crawlers following stale links, and broken front-end code requesting several missing assets at once. Tune by allowlisting known crawler ranges.
+- **Limitations:** a scanner that paces itself slower than 5 paths per 10 seconds, or rotates through many IPs, evades it. Query strings count as part of the path, so a missing page with changing parameters can look like many paths.
+- **Response:** block the IP, check whether any of its requests later returned 200, and review for follow-up exploitation.

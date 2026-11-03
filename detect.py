@@ -131,8 +131,40 @@ def detect_slow_spray(window=1800, min_users=4):
     return findings
 
 
+def detect_404_burst(window=10, min_paths=5):
+    """Flag an IP that hits many different missing pages in seconds, whatever its User-Agent says."""
+    findings, attempts = [], collections.defaultdict(list)
+    for line in open(WEB):
+        line = line.strip()
+        m = WEBLINE.match(line)
+        if not m:
+            continue
+        ip, when, _method, path, status, _size, _ua = m.groups()
+        if status != "404":
+            continue
+        attempts[ip].append({"timestamp": dt.datetime.strptime(when, "%d/%b/%Y:%H:%M:%S %z"), "path": path, "line": line})
+    for ip, events in attempts.items():
+        events.sort(key=lambda e: e["timestamp"])
+        for i, current in enumerate(events):
+            start = current["timestamp"]
+            paths = {current["path"]}
+            evidence = [current["line"]]
+            for nxt in events[i + 1:]:
+                if (nxt["timestamp"] - start).total_seconds() > window:
+                    break
+                paths.add(nxt["path"])
+                if len(evidence) < 3:
+                    evidence.append(nxt["line"])
+            if len(paths) >= min_paths:
+                findings.append(dict(rule="404_burst", severity="medium", mitre="T1595.003",
+                                     title=f"404 burst from {ip}: {len(paths)} different missing pages within {window}s",
+                                     src_ip=ip, evidence=evidence))
+                break
+    return findings
+
+
 def run():
-    return detect_ssh() + detect_web() + detect_new_user_then_cron() + detect_slow_spray()
+    return detect_ssh() + detect_web() + detect_new_user_then_cron() + detect_slow_spray() + detect_404_burst()
 
 
 if __name__ == "__main__":

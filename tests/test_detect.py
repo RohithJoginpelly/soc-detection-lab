@@ -102,3 +102,46 @@ def test_slow_spray_ignores_few_usernames(tmp_path, monkeypatch):
 
     monkeypatch.setattr(detect, "AUTH", _write_spray_log(tmp_path, ["root", "admin", "root", "admin", "root"], [0, 5, 10, 15, 20]))
     assert detect.detect_slow_spray() == []
+
+
+def _write_web_log(tmp_path, hits, ip="198.51.100.150"):
+    import datetime as dt
+
+    base = dt.datetime(2026, 11, 1, 4, 0, 0)
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/118.0"
+    lines = [
+        f'{ip} - - [{(base + dt.timedelta(seconds=s)).strftime("%d/%b/%Y:%H:%M:%S")} +0000] "GET {p} HTTP/1.1" 404 196 "-" "{ua}"'
+        for s, p in hits
+    ]
+    log = tmp_path / "web_access.log"
+    log.write_text("\n".join(lines) + "\n")
+    return str(log)
+
+
+def test_404_burst_catches_scanner_with_normal_user_agent(tmp_path, monkeypatch):
+    sys.path.insert(0, str(ROOT))
+    import detect
+
+    hits = [(0, "/a"), (1, "/b"), (2, "/c"), (3, "/d"), (5, "/e"), (8, "/f")]
+    monkeypatch.setattr(detect, "WEB", _write_web_log(tmp_path, hits))
+    found = detect.detect_404_burst()
+    assert len(found) == 1
+    assert found[0]["src_ip"] == "198.51.100.150"
+
+
+def test_404_burst_ignores_slow_misses(tmp_path, monkeypatch):
+    sys.path.insert(0, str(ROOT))
+    import detect
+
+    hits = [(0, "/a"), (60, "/b"), (120, "/c"), (180, "/d"), (240, "/e"), (300, "/f")]
+    monkeypatch.setattr(detect, "WEB", _write_web_log(tmp_path, hits))
+    assert detect.detect_404_burst() == []
+
+
+def test_404_burst_ignores_one_broken_link(tmp_path, monkeypatch):
+    sys.path.insert(0, str(ROOT))
+    import detect
+
+    hits = [(i // 4, "/broken.png") for i in range(20)]
+    monkeypatch.setattr(detect, "WEB", _write_web_log(tmp_path, hits))
+    assert detect.detect_404_burst() == []
